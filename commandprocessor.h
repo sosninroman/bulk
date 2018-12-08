@@ -6,6 +6,7 @@
 #include <deque>
 #include <queue>
 #include <string>
+#include <stdexcept>
 
 namespace bulk
 {
@@ -18,9 +19,11 @@ class CommandProcessor
 {
     enum class Status
     {
-        BULK_IS_LOADING = 0,
+        BULK_IS_EMPTY = 0,
+        BULK_IS_LOADING,
         BULK_IS_READY,
         BULK_IS_READY_START_BRACE_BULK,
+        BRACE_BULK_IS_EMPTY,
         BRACE_BULK_IS_LOADING
     };
 public:
@@ -38,16 +41,21 @@ private:
 
     std::queue<std::string> flush()
     {
+        if(m_buffer.empty() )
+            return std::queue<std::string>();
+
         std::queue<std::string> cmds(m_buffer);
         m_buffer.clear();
+
         if(m_status == Status::BULK_IS_READY_START_BRACE_BULK)
         {
-            m_status = Status::BRACE_BULK_IS_LOADING;
+            m_status = Status::BRACE_BULK_IS_EMPTY;
         }
         if(m_status == Status::BULK_IS_READY)
         {
-            m_status = Status::BULK_IS_LOADING;
+            m_status = Status::BULK_IS_EMPTY;
         }
+
         return cmds;
     }
 
@@ -55,7 +63,7 @@ private:
 private:
     HandlerType m_handler;
 
-    Status m_status = Status::BULK_IS_LOADING;
+    Status m_status = Status::BULK_IS_EMPTY;
     size_t m_bulkSize;
     std::deque<std::string> m_buffer;
     size_t m_braceCounter = 0;
@@ -73,17 +81,16 @@ void CommandProcessor<HandlerType>::processCommandsStream(std::istream &stream)
             processCommands(flush() );
         }
     }
-    assert(m_status == Status::BULK_IS_LOADING || m_status == Status::BRACE_BULK_IS_LOADING);
-    if(!m_buffer.empty() )
+    assert(m_status == Status::BULK_IS_LOADING || m_status == Status::BRACE_BULK_IS_LOADING
+           || m_status == Status::BULK_IS_EMPTY || m_status == Status::BRACE_BULK_IS_EMPTY);
+
+    if(m_status == Status::BULK_IS_LOADING)
     {
-        if(m_status == Status::BULK_IS_LOADING)
-        {
-            processCommands(flush() );
-        }
-        else
-        {
-            flush();
-        }
+        processCommands(flush() );
+    }
+    if(m_status == Status::BRACE_BULK_IS_EMPTY)
+    {
+        flush();
     }
 }
 
@@ -96,7 +103,7 @@ void CommandProcessor<HandlerType>::processCommands(const std::queue<std::string
 template<class HandlerType>
 typename CommandProcessor<HandlerType>::Status CommandProcessor<HandlerType>::pushCmd(const std::string& cmd)
 {
-    assert(m_status != Status::BULK_IS_READY);
+    assert(m_status != Status::BULK_IS_READY && m_status != Status::BULK_IS_READY_START_BRACE_BULK);
 
     if(cmd == BRACE_LEFT)
     {
@@ -109,6 +116,15 @@ typename CommandProcessor<HandlerType>::Status CommandProcessor<HandlerType>::pu
 
     m_buffer.push_back(cmd);
 
+    if(m_status == Status::BULK_IS_EMPTY)
+    {
+        m_status = Status::BULK_IS_LOADING;
+    }
+    if(m_status == Status::BRACE_BULK_IS_EMPTY)
+    {
+        m_status = Status::BRACE_BULK_IS_LOADING;
+    }
+
     if(m_status == Status::BULK_IS_LOADING && m_buffer.size() == m_bulkSize)
     {
         m_status = Status::BULK_IS_READY;
@@ -120,11 +136,16 @@ typename CommandProcessor<HandlerType>::Status CommandProcessor<HandlerType>::pu
 template<class HandlerType>
 typename CommandProcessor<HandlerType>::Status CommandProcessor<HandlerType>::handleLeftBrace()
 {
-    assert(m_status == Status::BULK_IS_LOADING || m_status == Status::BRACE_BULK_IS_LOADING);
+    assert(m_status == Status::BULK_IS_LOADING || m_status == Status::BRACE_BULK_IS_LOADING
+           || m_status == Status::BULK_IS_EMPTY || m_status == Status::BRACE_BULK_IS_EMPTY);
     ++m_braceCounter;
     if(m_status == Status::BULK_IS_LOADING)
     {
         m_status = Status::BULK_IS_READY_START_BRACE_BULK;
+    }
+    if(m_status == Status::BULK_IS_EMPTY)
+    {
+        m_status = Status::BRACE_BULK_IS_EMPTY;
     }
     return m_status;
 }
@@ -132,8 +153,8 @@ typename CommandProcessor<HandlerType>::Status CommandProcessor<HandlerType>::ha
 template<class HandlerType>
 typename CommandProcessor<HandlerType>::Status CommandProcessor<HandlerType>::handleRightBrace()
 {
-    assert(m_status == Status::BRACE_BULK_IS_LOADING);
-    assert(m_braceCounter);
+    if(m_status != Status::BRACE_BULK_IS_LOADING && m_status != Status::BRACE_BULK_IS_EMPTY || !m_braceCounter)
+        throw std::invalid_argument("too mach right braces");
 
     --m_braceCounter;
     if(!m_braceCounter)
