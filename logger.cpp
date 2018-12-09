@@ -15,6 +15,10 @@ void SpdLogger::handleCommands(std::queue<std::string> commands)
 
 void SpdLogger::openLog(const std::string& logfile)
 {
+    if(m_fileLog)
+    {
+        spdlog::drop(FILE_LOGGER_NAME);
+    }
     m_fileLog = spdlog::basic_logger_mt(FILE_LOGGER_NAME, logfile);
     m_fileLog->set_pattern("%v");
 }

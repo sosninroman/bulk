@@ -1,24 +1,26 @@
 #include <iostream>
-#include <spdlog/spdlog.h>
-#include <spdlog/sinks/basic_file_sink.h>
+#include "commandprocessor.h"
 #include "logger.h"
-#include <spdlog/common.h>
-#include <queue>
 
-int main()
+int main(int argc, char* argv[])
 {
+    if(argc < 2)
+    {
+        return 0;
+    }
+    int bulkSize = std::atoi(argv[1]);
     try
     {
-        std::queue<std::string> q;
-        q.push(std::string("a"));
-        q.push(std::string("b"));
-        q.push(std::string("c"));
-        bulk::SpdLogger log;
-        log.handleCommands(q);
+        bulk::CommandProcessor<bulk::SpdLogger> processor(bulkSize);
+        processor.processCommandsStream(std::cin);
     }
-    catch (const spdlog::spdlog_ex &ex)
+    catch (const spdlog::spdlog_ex& ex)
     {
-        std::cout << "Log init failed: " << ex.what() << std::endl;
+        std::cout << ex.what() << std::endl;
+    }
+    catch (const std::exception& ex)
+    {
+        std::cout << ex.what() << std::endl;
     }
     return 0;
 }

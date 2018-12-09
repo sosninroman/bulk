@@ -10,8 +10,8 @@
 namespace bulk
 {
 
-const std::string FILE_LOGGER_NAME = std::string("bulk log");
-const std::string CONSOLE_LOGGER_NAME = std::string("console");
+const std::string FILE_LOGGER_NAME = std::string("file_log");
+const std::string CONSOLE_LOGGER_NAME = std::string("console_log");
 
 class SpdLogger
 {

@@ -1,8 +1,7 @@
-#ifndef CommandProcessor_H
-#define CommandProcessor_H
+#ifndef COMMANDPROCESSOR_H
+#define COMMANDPROCESSOR_H
 
 #include <cassert>
-#include <chrono>
 #include <deque>
 #include <queue>
 #include <string>
@@ -11,23 +10,23 @@
 namespace bulk
 {
 
-const std::string BRACE_LEFT = std::string("{");
-const std::string BRACE_RIGHT = std::string("}");
+const std::string OPEN_BLOCK_SYMBOL = std::string("{");
+const std::string CLOSE_BLOCK_SYMBOL = std::string("}");
 
 template<class HandlerType>
 class CommandProcessor
 {
     enum class Status
     {
-        BULK_IS_EMPTY = 0,
-        BULK_IS_LOADING,
-        BULK_IS_READY,
-        BULK_IS_READY_START_BRACE_BULK,
-        BRACE_BULK_IS_EMPTY,
-        BRACE_BULK_IS_LOADING
+        EMPTY,
+        BLOCK_EMPTY,
+        LOADING,
+        BLOCK_LOADING,
+        READY,
+        READY_START_BLOCK_BULK
     };
 public:
-    CommandProcessor(size_t bulkSize, const HandlerType& logger = HandlerType()):
+    explicit CommandProcessor(size_t bulkSize, const HandlerType& logger = HandlerType()):
         m_handler(logger), m_bulkSize(bulkSize)
     {}
 
@@ -36,8 +35,8 @@ private:
     Status pushCmd(const std::string& cmd);
     std::string popCmd();
 
-    Status handleLeftBrace();
-    Status handleRightBrace();
+    Status handleOpenBlockSymbol();
+    Status handleCloseBlockSymbol();
 
     std::queue<std::string> flush()
     {
@@ -47,23 +46,24 @@ private:
         std::queue<std::string> cmds(m_buffer);
         m_buffer.clear();
 
-        if(m_status == Status::BULK_IS_READY_START_BRACE_BULK)
+        if(m_status == Status::READY_START_BLOCK_BULK)
         {
-            m_status = Status::BRACE_BULK_IS_EMPTY;
+            m_status = Status::BLOCK_EMPTY;
         }
-        if(m_status == Status::BULK_IS_READY)
+        else
         {
-            m_status = Status::BULK_IS_EMPTY;
+            m_status = Status::EMPTY;
         }
 
         return cmds;
     }
 
+    //throw std::invalid_argument
     void processCommands(const std::queue<std::string> cmds);
 private:
     HandlerType m_handler;
 
-    Status m_status = Status::BULK_IS_EMPTY;
+    Status m_status = Status::EMPTY;
     size_t m_bulkSize;
     std::deque<std::string> m_buffer;
     size_t m_braceCounter = 0;
@@ -76,19 +76,19 @@ void CommandProcessor<HandlerType>::processCommandsStream(std::istream &stream)
     {
         auto status = pushCmd(command);
 
-        if(status == Status::BULK_IS_READY || status == Status::BULK_IS_READY_START_BRACE_BULK)
+        if(status == Status::READY || status == Status::READY_START_BLOCK_BULK)
         {
             processCommands(flush() );
         }
     }
-    assert(m_status == Status::BULK_IS_LOADING || m_status == Status::BRACE_BULK_IS_LOADING
-           || m_status == Status::BULK_IS_EMPTY || m_status == Status::BRACE_BULK_IS_EMPTY);
+    assert(m_status == Status::LOADING || m_status == Status::BLOCK_LOADING
+           || m_status == Status::EMPTY || m_status == Status::BLOCK_EMPTY);
 
-    if(m_status == Status::BULK_IS_LOADING)
+    if(m_status == Status::LOADING)
     {
         processCommands(flush() );
     }
-    if(m_status == Status::BRACE_BULK_IS_EMPTY)
+    if(m_status == Status::BLOCK_LOADING)
     {
         flush();
     }
@@ -103,63 +103,63 @@ void CommandProcessor<HandlerType>::processCommands(const std::queue<std::string
 template<class HandlerType>
 typename CommandProcessor<HandlerType>::Status CommandProcessor<HandlerType>::pushCmd(const std::string& cmd)
 {
-    assert(m_status != Status::BULK_IS_READY && m_status != Status::BULK_IS_READY_START_BRACE_BULK);
+    assert(m_status != Status::READY && m_status != Status::READY_START_BLOCK_BULK);
 
-    if(cmd == BRACE_LEFT)
+    if(cmd == OPEN_BLOCK_SYMBOL)
     {
-        return handleLeftBrace();
+        return handleOpenBlockSymbol();
     }
-    if(cmd == BRACE_RIGHT)
+    if(cmd == CLOSE_BLOCK_SYMBOL)
     {
-        return handleRightBrace();
+        return handleCloseBlockSymbol();
     }
 
     m_buffer.push_back(cmd);
 
-    if(m_status == Status::BULK_IS_EMPTY)
+    if(m_status == Status::EMPTY)
     {
-        m_status = Status::BULK_IS_LOADING;
+        m_status = Status::LOADING;
     }
-    if(m_status == Status::BRACE_BULK_IS_EMPTY)
+    if(m_status == Status::BLOCK_EMPTY)
     {
-        m_status = Status::BRACE_BULK_IS_LOADING;
+        m_status = Status::BLOCK_LOADING;
     }
 
-    if(m_status == Status::BULK_IS_LOADING && m_buffer.size() == m_bulkSize)
+    if(m_status == Status::LOADING && m_buffer.size() == m_bulkSize)
     {
-        m_status = Status::BULK_IS_READY;
+        m_status = Status::READY;
     }
 
     return m_status;
 }
 
 template<class HandlerType>
-typename CommandProcessor<HandlerType>::Status CommandProcessor<HandlerType>::handleLeftBrace()
+typename CommandProcessor<HandlerType>::Status CommandProcessor<HandlerType>::handleOpenBlockSymbol()
 {
-    assert(m_status == Status::BULK_IS_LOADING || m_status == Status::BRACE_BULK_IS_LOADING
-           || m_status == Status::BULK_IS_EMPTY || m_status == Status::BRACE_BULK_IS_EMPTY);
+    assert(m_status == Status::LOADING || m_status == Status::BLOCK_LOADING
+           || m_status == Status::EMPTY || m_status == Status::BLOCK_EMPTY);
     ++m_braceCounter;
-    if(m_status == Status::BULK_IS_LOADING)
+    if(m_status == Status::LOADING)
     {
-        m_status = Status::BULK_IS_READY_START_BRACE_BULK;
+        m_status = Status::READY_START_BLOCK_BULK;
     }
-    if(m_status == Status::BULK_IS_EMPTY)
+    if(m_status == Status::EMPTY)
     {
-        m_status = Status::BRACE_BULK_IS_EMPTY;
+        m_status = Status::BLOCK_EMPTY;
     }
     return m_status;
 }
 
 template<class HandlerType>
-typename CommandProcessor<HandlerType>::Status CommandProcessor<HandlerType>::handleRightBrace()
+typename CommandProcessor<HandlerType>::Status CommandProcessor<HandlerType>::handleCloseBlockSymbol()
 {
-    if(m_status != Status::BRACE_BULK_IS_LOADING && m_status != Status::BRACE_BULK_IS_EMPTY || !m_braceCounter)
-        throw std::invalid_argument("too mach right braces");
+    if((m_status != Status::BLOCK_LOADING && m_status != Status::BLOCK_EMPTY) || !m_braceCounter)
+        throw std::invalid_argument("invalid command sequence: too much close block symbols!");
 
     --m_braceCounter;
     if(!m_braceCounter)
     {
-        m_status = Status::BULK_IS_READY;
+        m_status = Status::READY;
     }
     return m_status;
 }
