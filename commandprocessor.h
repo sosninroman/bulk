@@ -84,13 +84,16 @@ void CommandProcessor<HandlerType>::processCommandsStream(std::istream &stream)
     assert(m_status == Status::LOADING || m_status == Status::BLOCK_LOADING
            || m_status == Status::EMPTY || m_status == Status::BLOCK_EMPTY);
 
-    if(m_status == Status::LOADING)
+    switch(m_status)
     {
+    case Status::LOADING:
         processCommands(flush() );
-    }
-    if(m_status == Status::BLOCK_LOADING)
-    {
+        break;
+    case Status::BLOCK_LOADING:
         flush();
+        break;
+    default:
+        break;
     }
 }
 
@@ -116,13 +119,16 @@ typename CommandProcessor<HandlerType>::Status CommandProcessor<HandlerType>::pu
 
     m_buffer.push_back(cmd);
 
-    if(m_status == Status::EMPTY)
+    switch(m_status)
     {
+    case Status::EMPTY:
         m_status = Status::LOADING;
-    }
-    if(m_status == Status::BLOCK_EMPTY)
-    {
+        break;
+    case Status::BLOCK_EMPTY:
         m_status = Status::BLOCK_LOADING;
+        break;
+    default:
+        break;
     }
 
     if(m_status == Status::LOADING && m_buffer.size() == m_bulkSize)
@@ -138,15 +144,20 @@ typename CommandProcessor<HandlerType>::Status CommandProcessor<HandlerType>::ha
 {
     assert(m_status == Status::LOADING || m_status == Status::BLOCK_LOADING
            || m_status == Status::EMPTY || m_status == Status::BLOCK_EMPTY);
+
     ++m_braceCounter;
-    if(m_status == Status::LOADING)
+    switch(m_status)
     {
+    case Status::LOADING:
         m_status = Status::READY_START_BLOCK_BULK;
-    }
-    if(m_status == Status::EMPTY)
-    {
+        break;
+    case Status::EMPTY:
         m_status = Status::BLOCK_EMPTY;
+        break;
+    default:
+        break;
     }
+
     return m_status;
 }
 
