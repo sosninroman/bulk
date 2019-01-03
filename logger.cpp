@@ -3,7 +3,7 @@
 namespace bulk
 {
 
-void SpdLogger::handleCommands(std::queue<std::string> commands)
+void ConsequentLogger::handleCommands(std::queue<std::string> commands)
 {
     std::string logName("bulk");
     auto nowDuration = std::chrono::system_clock::now().time_since_epoch();
@@ -13,7 +13,7 @@ void SpdLogger::handleCommands(std::queue<std::string> commands)
     writeCommands(commands);
 }
 
-void SpdLogger::openLog(const std::string& logfile)
+void ConsequentLogger::openLog(const std::string& logfile)
 {
     if(m_fileLog)
     {
@@ -23,7 +23,7 @@ void SpdLogger::openLog(const std::string& logfile)
     m_fileLog->set_pattern("%v");
 }
 
-void SpdLogger::writeCommands(std::queue<std::string>& commands)
+void ConsequentLogger::writeCommands(std::queue<std::string>& commands)
 {
     std::string str;
     while(!commands.empty() )

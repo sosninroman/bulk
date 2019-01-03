@@ -11,7 +11,7 @@ int main(int argc, char* argv[])
     int bulkSize = std::atoi(argv[1]);
     try
     {
-        bulk::CommandProcessor<bulk::SpdLogger> processor(bulkSize);
+        bulk::CommandProcessor<bulk::ConsequentLogger> processor(bulkSize);
         processor.processCommandsStream(std::cin);
     }
     catch (const spdlog::spdlog_ex& ex)

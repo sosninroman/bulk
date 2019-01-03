@@ -13,10 +13,10 @@ namespace bulk
 const std::string FILE_LOGGER_NAME = std::string("file_log");
 const std::string CONSOLE_LOGGER_NAME = std::string("console_log");
 
-class SpdLogger
+class ConsequentLogger
 {
 public:
-    SpdLogger():
+    ConsequentLogger():
         m_consoleLog(spdlog::stdout_logger_st(CONSOLE_LOGGER_NAME))
     {
         m_consoleLog->set_pattern("bulk: %v");
