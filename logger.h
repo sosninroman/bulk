@@ -6,12 +6,12 @@
 #include "spdlog/sinks/basic_file_sink.h"
 #include <queue>
 #include <iostream>
+#include "bulkconstants.h"
 
 namespace bulk
 {
 
 const std::string FILE_LOGGER_NAME = std::string("file_log");
-const std::string CONSOLE_LOGGER_NAME = std::string("console_log");
 
 class ConsequentLogger
 {

@@ -26,8 +26,12 @@ class CommandProcessor
         READY_START_BLOCK_BULK
     };
 public:
-    explicit CommandProcessor(size_t bulkSize, const HandlerType& logger = HandlerType()):
-        m_handler(logger), m_bulkSize(bulkSize)
+    explicit CommandProcessor(size_t bulkSize):
+        m_bulkSize(bulkSize)
+    {}
+
+    CommandProcessor(size_t bulkSize, HandlerType handler):
+        m_handler(std::move(handler) ), m_bulkSize(bulkSize)
     {}
 
     void processCommandsStream(std::istream &stream);

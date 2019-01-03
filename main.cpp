@@ -1,6 +1,7 @@
 #include <iostream>
 #include "commandprocessor.h"
 #include "logger.h"
+#include "multithreadlogger.h"
 
 int main(int argc, char* argv[])
 {
@@ -11,7 +12,8 @@ int main(int argc, char* argv[])
     int bulkSize = std::atoi(argv[1]);
     try
     {
-        bulk::CommandProcessor<bulk::ConsequentLogger> processor(bulkSize);
+        //bulk::CommandProcessor<bulk::ConsequentLogger> processor(bulkSize);
+        bulk::CommandProcessor<bulk::MultiThreadLogger<2>> processor(bulkSize);
         processor.processCommandsStream(std::cin);
     }
     catch (const spdlog::spdlog_ex& ex)
