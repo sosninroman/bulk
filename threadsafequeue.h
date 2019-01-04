@@ -33,12 +33,18 @@ public:
         if(m_readingAvailable)
         {
             m_readingAvailable = false;
+
+            m_cond.notify_all();
+            while(m_readers)
+            {
+                std::this_thread::yield();
+            }
         }
-        m_cond.notify_all();
-        while(m_readers)
-        {
-            std::this_thread::yield();
-        }
+//        m_cond.notify_all();
+//        while(m_readers)
+//        {
+//            std::this_thread::yield();
+//        }
     }
 
     void setReadingAvailable(bool available)
@@ -72,6 +78,9 @@ public:
 
     std::shared_ptr<T> pop()
     {
+        if(!m_readingAvailable)
+            return std::shared_ptr<T>();
+
         std::unique_lock<std::mutex> lock(m_mutex);
         ++m_readers;
         m_cond.wait(lock, [this](){return !m_data.empty() || !m_readingAvailable;});
@@ -81,12 +90,19 @@ public:
             result = m_data.front();
             m_data.pop();
         }
+        lock.unlock();
         --m_readers;
         return result;
     }
+
+    bool empty() const
+    {
+        std::lock_guard<std::mutex> guard(m_mutex);
+        return m_data.empty();
+    }
 private:
     std::queue<std::shared_ptr<T>> m_data;
-    std::mutex m_mutex;
+    mutable std::mutex m_mutex;
     std::condition_variable m_cond;
     std::atomic_int m_readers;
     std::atomic_bool m_readingAvailable;

@@ -24,6 +24,9 @@ struct MemLogger
         (*m_values)[m_bulkCounter++] = str;
     }
 
+    void startWork(){return;}
+    void stopWork(){return;}
+
     std::shared_ptr<std::map<size_t, std::string> > m_values;
     size_t m_bulkCounter = 0;
 };

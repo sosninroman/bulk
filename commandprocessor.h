@@ -35,6 +35,11 @@ public:
     {}
 
     void processCommandsStream(std::istream &stream);
+
+    const HandlerType& handler() const {return m_handler;}
+    auto linesProcessed() const {return m_linesNum;}
+    auto blocksProcessed() const {return m_blocksNum;}
+    auto commandsProcessed() const {return m_commandsNum;}
 private:
     Status pushCmd(const std::string& cmd);
     std::string popCmd();
@@ -45,7 +50,11 @@ private:
     std::queue<std::string> flush()
     {
         if(m_buffer.empty() )
+        {
+            assert(m_status != Status::READY_START_BLOCK_BULK);
+            m_status = Status::EMPTY;
             return std::queue<std::string>();
+        }
 
         std::queue<std::string> cmds(m_buffer);
         m_buffer.clear();
@@ -71,17 +80,29 @@ private:
     size_t m_bulkSize;
     std::deque<std::string> m_buffer;
     size_t m_braceCounter = 0;
+
+    size_t m_linesNum = 0;
+    size_t m_blocksNum = 0;
+    size_t m_commandsNum = 0;
 };
 
 template<class HandlerType>
 void CommandProcessor<HandlerType>::processCommandsStream(std::istream &stream)
 {
+    m_handler.startWork();
+
     for(std::string command; std::getline(stream, command);)
     {
+        ++m_linesNum;
+        if(command != OPEN_BLOCK_SYMBOL && command != CLOSE_BLOCK_SYMBOL)
+        {
+            ++m_commandsNum;
+        }
         auto status = pushCmd(command);
 
         if(status == Status::READY || status == Status::READY_START_BLOCK_BULK)
         {
+            ++m_blocksNum;
             processCommands(flush() );
         }
     }
@@ -91,6 +112,7 @@ void CommandProcessor<HandlerType>::processCommandsStream(std::istream &stream)
     switch(m_status)
     {
     case Status::LOADING:
+        ++m_blocksNum;
         processCommands(flush() );
         break;
     case Status::BLOCK_LOADING:
@@ -99,6 +121,8 @@ void CommandProcessor<HandlerType>::processCommandsStream(std::istream &stream)
     default:
         break;
     }
+
+    m_handler.stopWork();
 }
 
 template<class HandlerType>

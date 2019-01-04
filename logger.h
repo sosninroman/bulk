@@ -23,6 +23,8 @@ public:
     }
 
     void handleCommands(std::queue<std::string> commands);
+    void startWork(){return;}
+    void stopWork() {return;}
 private:
     void openLog(const std::string &logfile);
     void writeCommands(std::queue<std::string> &commands);

@@ -1,6 +1,7 @@
 #ifndef MULTITHREADLOGGER_H
 #define MULTITHREADLOGGER_H
 
+#include <iostream>
 #include <thread>
 #include <functional>
 #include "spdlog/spdlog.h"
@@ -8,9 +9,16 @@
 #include "spdlog/sinks/basic_file_sink.h"
 #include "threadsafequeue.h"
 #include "bulkconstants.h"
+#include <map>
 
 namespace bulk
 {
+
+struct StatBlock
+{
+    int blocksNum = 0;
+    int commandsNum = 0;
+};
 
 namespace internal
 {
@@ -22,7 +30,6 @@ public:
         m_queue(queue), m_freeThreads(freeThreads)
     {
         m_thread = std::thread(&FileThread::process, this);
-        ++m_freeThreads;
     }
 
     FileThread(FileThread&) = delete;
@@ -30,14 +37,12 @@ public:
     FileThread(FileThread&& rhs):
         m_queue(rhs.m_queue),
         m_thread(std::move(rhs.m_thread)),
-        m_blocksNum(rhs.m_blocksNum),
-        m_commandsNum(rhs.m_commandsNum),
+        m_statBlock(rhs.m_statBlock),
         m_freeThreads(rhs.m_freeThreads)
     {}
 
     ~FileThread()
     {
-        --m_freeThreads;
         m_thread.join();
     }
 
@@ -47,26 +52,38 @@ public:
         {
             ++m_freeThreads;
             auto task = m_queue.pop();
+            --m_freeThreads;
             if(!task)
             {
                 return;
             }
             else
             {
-                ++m_blocksNum;
-                --m_freeThreads;
-                m_commandsNum += (*task)();
+                try
+                {
+                    auto cmdNum = (*task)();
+                    std::lock_guard<std::mutex> guard(m_statMutex);
+                    ++m_statBlock.blocksNum;
+                    m_statBlock.commandsNum += cmdNum;
+                }
+                catch(const std::exception& ex)
+                {
+                    std::cout << ex.what();
+                }
             }
         }
     }
 
-    int blocksNum() const {return m_blocksNum;}
-    int commandsNum() const {return m_commandsNum;}
+    StatBlock statBlock() const
+    {
+        std::lock_guard<std::mutex> guard(m_statMutex);
+        return m_statBlock;
+    }
 private:
     ThreadSafeQueue<std::function<int()>>& m_queue;
     std::thread m_thread;
-    int m_blocksNum = 0;
-    int m_commandsNum = 0;
+    StatBlock m_statBlock;
+    mutable std::mutex m_statMutex;
     std::atomic_int& m_freeThreads;
 };
 
@@ -80,9 +97,8 @@ public:
         m_consoleLog(spdlog::stdout_logger_st(CONSOLE_LOGGER_NAME)),
         m_freeThreads(0)
     {
-        m_fileThreads.reserve(ThreadsNum);
         m_consoleLog->set_pattern("bulk: %v");
-        m_consoleThread = std::thread(&MultiThreadLogger::process, this);
+        m_fileThreads.reserve(ThreadsNum);
     }
 
     MultiThreadLogger(const MultiThreadLogger&) = delete;
@@ -92,14 +108,80 @@ public:
     {
         m_bulks.cancelReading();
         m_fileLoggingTasks.cancelReading();
-        m_consoleThread.join();
+        if(m_consoleThread.joinable() )
+        {
+            m_consoleThread.join();
+        }
+    }
+
+    void startWork()
+    {
+        if(!m_isWorking)
+        {
+            m_isWorking = true;
+            assert(!m_consoleThread.joinable() );
+
+            if(!m_fileThreads.empty() )
+            {
+                m_fileThreads.clear();
+            }
+
+            m_consoleThread = std::thread(&MultiThreadLogger::process, this);
+        }
+    }
+
+    void stopWork()
+    {
+        if(m_isWorking)
+        {
+            m_isWorking = false;
+
+            while(!m_bulks.empty() )
+            {
+                std::this_thread::yield();
+            }
+            m_bulks.cancelReading();
+            assert(m_consoleThread.joinable() );
+            m_consoleThread.join();
+
+            while(!m_fileLoggingTasks.empty() )
+            {
+                std::this_thread::yield();
+            }
+            m_fileLoggingTasks.cancelReading();
+        }
     }
 
     void handleCommands(std::queue<std::string> commands)
     {
-        m_bulks.push(commands);
+        if(m_isWorking)
+        {
+            m_bulks.push(commands);
+        }
     }
 
+    std::map<std::string, StatBlock> getStat() const
+    {
+        std::lock_guard<std::mutex> guard(m_statMutex);
+        std::map<std::string, StatBlock> result;
+        result.insert(std::make_pair(CONSOLE_THREAD_STAT_NAME, m_statBlock));
+        size_t ind = 0;
+        for(const auto& thread : m_fileThreads)
+        {
+            const std::string threadName = FILE_THREAD_STAT_NAME + std::to_string(ind);
+            result.insert(std::make_pair(threadName, thread.statBlock() ) );
+            ++ind;
+        }
+        assert(ind <= ThreadsNum);
+        while(ind != ThreadsNum)
+        {
+            const std::string threadName = FILE_THREAD_STAT_NAME + std::to_string(ind);
+            result.insert(std::make_pair(threadName, StatBlock() ) );
+            ++ind;
+        }
+        return result;
+    }
+private:
     void process()
     {
         while(true)
@@ -124,12 +206,11 @@ public:
                 }
 
                 std::string logName("bulk");
-                auto nowDuration = std::chrono::system_clock::now().time_since_epoch();
-                auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(nowDuration).count();
-                logName.append(std::to_string(ms) ).append(".log");
-                std::queue<std::string> cmds = *commands;
+                const auto nowDuration = std::chrono::system_clock::now().time_since_epoch();
+                const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(nowDuration).count();
+                logName.append(std::to_string(ms) ).append(std::to_string(m_uniqueNamePostfix++) ).append(".log");
 
-                m_fileLoggingTasks.emplace([cmds, logName]() mutable {
+                m_fileLoggingTasks.emplace([cmds = *commands, logName]() mutable {
                     auto fileLog = spdlog::basic_logger_mt(logName, logName);
                     fileLog->set_pattern("%v");
                     int sz = cmds.size();
@@ -153,8 +234,10 @@ public:
                         str.append(",");
                 }
                 m_consoleLog->info(str);
-                ++m_blocksNum;
-                m_commandsNum += sz;
+
+                std::lock_guard<std::mutex> guard(m_statMutex);
+                ++m_statBlock.blocksNum;
+                m_statBlock.commandsNum += sz;
             }
         }
     }
@@ -165,12 +248,16 @@ private:
     std::thread m_consoleThread;
     std::shared_ptr<spdlog::logger> m_consoleLog = nullptr;
 
-    int m_blocksNum = 0;
-    int m_commandsNum = 0;
+    mutable std::mutex m_statMutex;
+    StatBlock m_statBlock;
 
     std::vector<internal::FileThread> m_fileThreads;
 
+    bool m_isWorking = false;
+
     std::atomic_int m_freeThreads;
+
+    size_t m_uniqueNamePostfix = 0;
 };
 
 }

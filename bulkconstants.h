@@ -3,6 +3,13 @@
 
 #include <string>
 
-const std::string CONSOLE_LOGGER_NAME = std::string("console_log");
+namespace bulk
+{
+
+extern const std::string CONSOLE_LOGGER_NAME;
+extern const std::string CONSOLE_THREAD_STAT_NAME;
+extern const std::string FILE_THREAD_STAT_NAME;
+
+}
 
 #endif

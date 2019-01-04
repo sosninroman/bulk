@@ -15,6 +15,18 @@ int main(int argc, char* argv[])
         //bulk::CommandProcessor<bulk::ConsequentLogger> processor(bulkSize);
         bulk::CommandProcessor<bulk::MultiThreadLogger<2>> processor(bulkSize);
         processor.processCommandsStream(std::cin);
+
+        std::cout << "Statistics: " << std::endl;
+        std::cout << "Total: " << processor.linesProcessed() << " lines, " <<
+                     processor.blocksProcessed() << " blocks, " <<
+                     processor.commandsProcessed() << " commands" << std::endl;
+        auto threadsInfo = processor.handler().getStat();
+        for(auto& pair : threadsInfo)
+        {
+            std::cout << pair.first << ": " <<
+                         pair.second.blocksNum << " blocks " <<
+                         pair.second.commandsNum << " commands " << std::endl;
+        }
     }
     catch (const spdlog::spdlog_ex& ex)
     {
