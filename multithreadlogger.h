@@ -126,6 +126,9 @@ public:
                 m_fileThreads.clear();
             }
 
+            m_bulks.setReadingAvailable(true);
+            m_fileLoggingTasks.setReadingAvailable(true);
+
             m_consoleThread = std::thread(&MultiThreadLogger::process, this);
         }
     }
@@ -213,7 +216,7 @@ private:
                 m_fileLoggingTasks.emplace([cmds = *commands, logName]() mutable {
                     auto fileLog = spdlog::basic_logger_mt(logName, logName);
                     fileLog->set_pattern("%v");
-                    int sz = cmds.size();
+                    const int sz = cmds.size();
                     while(!cmds.empty() )
                     {
                         auto cmd = cmds.front();

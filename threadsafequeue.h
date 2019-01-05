@@ -40,11 +40,6 @@ public:
                 std::this_thread::yield();
             }
         }
-//        m_cond.notify_all();
-//        while(m_readers)
-//        {
-//            std::this_thread::yield();
-//        }
     }
 
     void setReadingAvailable(bool available)
