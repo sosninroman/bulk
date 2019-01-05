@@ -6,7 +6,7 @@ before_install:
   - sudo apt-get update -qq
 
 install: 
-  - sudo apt-get install -qq g++-6
+  - sudo apt-get install -qq g++-6 gcc-6
   - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-6 90
   
 script:
@@ -18,4 +18,6 @@ deploy:
   provider: script
   skip_cleanup: true
   script:
-  - curl -T bulk-0.0.$TRAVIS_BUILD_NUMBER-Linux.deb -u$USER_NAME:$BINTRAY_API_KEY "https://api.bintray.com/content/sosninroman/$BINTRAY_REPO_NAME/$BINTRAY_PACK_NAME/$TRAVIS_BUILD_NUMBER/bulk-0.0.$TRAVIS_BUILD_NUMBER-Linux.deb;deb_distribution=trusty;deb_component=main;deb_architecture=amd64;publish=1"
+  - curl -T bulkmt-0.0.$TRAVIS_BUILD_NUMBER-Linux.deb -u$USER_NAME:$BINTRAY_API_KEY "https://api.bintray.com/content/sosninroman/$BINTRAY_REPO_NAME/$BINTRAY_PACK_NAME/$TRAVIS_BUILD_NUMBER/bulkmt-0.0.$TRAVIS_BUILD_NUMBER-Linux.deb;deb_distribution=trusty;deb_component=main;deb_architecture=amd64;publish=1"
+  on:
+    branch: parallel-processing

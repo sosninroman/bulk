@@ -1,29 +1,35 @@
 cmake_minimum_required(VERSION 3.2)
 
-project(bulk VERSION 0.0.$ENV{TRAVIS_BUILD_NUMBER})
+project(bulkmt VERSION 0.0.$ENV{TRAVIS_BUILD_NUMBER})
 
-file(GLOB BULK_H
+find_package (Threads)
+
+file(GLOB BULKMT_H
         "${PROJECT_SOURCE_DIR}/*.h",
         "${PROJECT_SOURCE_DIR}/extern/spdlog/include/*.h"
         )
 
-file(GLOB BULK_SRC
+file(GLOB BULKMT_SRC
         "${PROJECT_SOURCE_DIR}/*.cpp"
         )
 		
 include_directories("${PROJECT_SOURCE_DIR}/extern/spdlog/include")
 include_directories("${PROJECT_SOURCE_DIR}/extern/spdlog")
-add_executable(bulk ${BULK_SRC} ${BULK_H} )
+add_executable(bulkmt ${BULKMT_SRC} ${BULKMT_H} )
 
 set(CMAKE_CXX_STANDARD 14)
 
-set_target_properties(bulk PROPERTIES
+set_target_properties(bulkmt PROPERTIES
   CXX_STANDARD_REQUIRED ON
   CXX_STANDARD 14
   COMPILE_OPTIONS "-Wpedantic;-Wall;-Wextra"
 )
 
-install(TARGETS bulk RUNTIME DESTINATION bin)
+target_link_libraries(bulkmt
+  ${CMAKE_THREAD_LIBS_INIT}
+  )
+
+install(TARGETS bulkmt RUNTIME DESTINATION bin)
 
 macro(install)
 endmacro()
