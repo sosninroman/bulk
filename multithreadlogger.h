@@ -29,6 +29,7 @@ public:
     FileThread(ThreadSafeQueue<std::function<int()>>& queue, std::atomic_int& freeThreads):
         m_queue(queue), m_freeThreads(freeThreads)
     {
+        m_isWorking = true;
         m_thread = std::thread(&FileThread::process, this);
     }
 
@@ -46,45 +47,22 @@ public:
         m_thread.join();
     }
 
-    void process()
-    {
-        while(true)
-        {
-            ++m_freeThreads;
-            auto task = m_queue.pop();
-            --m_freeThreads;
-            if(!task)
-            {
-                return;
-            }
-            else
-            {
-                try
-                {
-                    auto cmdNum = (*task)();
-                    std::lock_guard<std::mutex> guard(m_statMutex);
-                    ++m_statBlock.blocksNum;
-                    m_statBlock.commandsNum += cmdNum;
-                }
-                catch(const std::exception& ex)
-                {
-                    std::cout << ex.what();
-                }
-            }
-        }
-    }
+    void process();
 
     StatBlock statBlock() const
     {
         std::lock_guard<std::mutex> guard(m_statMutex);
         return m_statBlock;
     }
+
+    bool isWorking() const {return m_isWorking;}
 private:
     ThreadSafeQueue<std::function<int()>>& m_queue;
     std::thread m_thread;
     StatBlock m_statBlock;
     mutable std::mutex m_statMutex;
     std::atomic_int& m_freeThreads;
+    std::atomic_int m_isWorking{false};
 };
 
 }
@@ -147,12 +125,27 @@ public:
             assert(m_consoleThread.joinable() );
             m_consoleThread.join();
 
-            while(!m_fileLoggingTasks.empty() )
+            while(!allFileThreadsAreStopped() )
             {
+                if(m_fileLoggingTasks.empty() )
+                {
+                    m_fileLoggingTasks.cancelReading();
+                }
                 std::this_thread::yield();
             }
-            m_fileLoggingTasks.cancelReading();
         }
+    }
+
+    bool allFileThreadsAreStopped()
+    {
+        for(const auto& fileThread : m_fileThreads)
+        {
+            if(fileThread.isWorking())
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     void handleCommands(std::queue<std::string> commands)
