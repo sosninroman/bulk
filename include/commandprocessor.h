@@ -12,6 +12,7 @@ namespace bulk
 
 const std::string OPEN_BLOCK_SYMBOL = std::string("{");
 const std::string CLOSE_BLOCK_SYMBOL = std::string("}");
+const std::string DELIM_SYMBOL = std::string("\n");
 
 template<class HandlerType>
 class CommandProcessor
@@ -34,7 +35,13 @@ public:
         m_handler(std::move(handler) ), m_bulkSize(bulkSize)
     {}
 
+    //Sync interface
     void processCommandsStream(std::istream &stream);
+
+    //Async interface
+    void startWork();
+    void appendCommandsStream(std::istream& stream);
+    void stopWork();
 
     const HandlerType& handler() const {return m_handler;}
     auto linesProcessed() const {return m_linesNum;}
@@ -106,6 +113,64 @@ void CommandProcessor<HandlerType>::processCommandsStream(std::istream &stream)
             processCommands(flush() );
         }
     }
+    assert(m_status == Status::LOADING || m_status == Status::BLOCK_LOADING
+           || m_status == Status::EMPTY || m_status == Status::BLOCK_EMPTY);
+
+    switch(m_status)
+    {
+    case Status::LOADING:
+        ++m_blocksNum;
+        processCommands(flush() );
+        break;
+    case Status::BLOCK_LOADING:
+        flush();
+        break;
+    default:
+        break;
+    }
+
+    m_handler.stopWork();
+}
+
+template<class HandlerType>
+void CommandProcessor<HandlerType>::startWork()
+{
+    m_handler.startWork();
+}
+
+template<class HandlerType>
+void CommandProcessor<HandlerType>::appendCommandsStream(std::istream& stream)
+{
+    auto cmdHandler = [this](const std::string& command){
+        ++m_linesNum;
+        if(command != OPEN_BLOCK_SYMBOL && command != CLOSE_BLOCK_SYMBOL)
+        {
+            ++m_commandsNum;
+        }
+        auto status = pushCmd(command);
+
+        if(status == Status::READY || status == Status::READY_START_BLOCK_BULK)
+        {
+            ++m_blocksNum;
+            processCommands(flush() );
+        }
+    };
+    std::string command;
+    if(std::getline(stream, command) &&
+            command == std::string() &&
+            (m_buffer.empty() || m_buffer.back() == std::string() ) )
+    {
+        cmdHandler(command);
+    }
+    for(; std::getline(stream, command);)
+    {
+        cmdHandler(command);
+    }
+}
+
+template<class HandlerType>
+void CommandProcessor<HandlerType>::stopWork()
+{
     assert(m_status == Status::LOADING || m_status == Status::BLOCK_LOADING
            || m_status == Status::EMPTY || m_status == Status::BLOCK_EMPTY);
 

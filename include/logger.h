@@ -7,6 +7,7 @@
 #include <queue>
 #include <iostream>
 #include "bulkconstants.h"
+#include "lognamesresolver.h"
 
 namespace bulk
 {
@@ -17,7 +18,8 @@ class ConsequentLogger
 {
 public:
     ConsequentLogger():
-        m_consoleLog(spdlog::stdout_logger_st(CONSOLE_LOGGER_NAME))
+        //m_consoleLog(spdlog::stdout_logger_st(CONSOLE_LOGGER_NAME))
+    m_consoleLog(spdlog::stdout_logger_st(CONSOLE_LOGGER_NAME+std::to_string(LogNamesResolver::instance().getNextConsoleLogPrefix())))
     {
         m_consoleLog->set_pattern("bulk: %v");
     }

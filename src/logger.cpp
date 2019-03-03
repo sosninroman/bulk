@@ -8,7 +8,9 @@ void ConsequentLogger::handleCommands(std::queue<std::string> commands)
     std::string logName("bulk");
     auto nowDuration = std::chrono::system_clock::now().time_since_epoch();
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(nowDuration).count();
-    logName.append(std::to_string(ms) ).append(".log");
+    logName.append(std::to_string(ms) ).
+            append(std::to_string(LogNamesResolver::instance().getNextFileLogPrefix() ) ).
+            append(".log");
     openLog(logName);
     writeCommands(commands);
 }

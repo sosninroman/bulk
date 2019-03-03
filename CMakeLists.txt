@@ -1,35 +1,40 @@
 cmake_minimum_required(VERSION 3.2)
 
-project(bulkmt VERSION 0.0.$ENV{TRAVIS_BUILD_NUMBER})
+project(async VERSION 0.0.$ENV{TRAVIS_BUILD_NUMBER})
 
 find_package (Threads)
 
-file(GLOB BULKMT_H
-        "${PROJECT_SOURCE_DIR}/*.h",
+file(GLOB ASYNC_H
+        "${PROJECT_SOURCE_DIR}/include/*.h",
         "${PROJECT_SOURCE_DIR}/extern/spdlog/include/*.h"
         )
 
-file(GLOB BULKMT_SRC
-        "${PROJECT_SOURCE_DIR}/*.cpp"
+file(GLOB ASYNC_SRC
+        "${PROJECT_SOURCE_DIR}/src/*.cpp"
         )
 		
-include_directories("${PROJECT_SOURCE_DIR}/extern/spdlog/include")
-include_directories("${PROJECT_SOURCE_DIR}/extern/spdlog")
-add_executable(bulkmt ${BULKMT_SRC} ${BULKMT_H} )
-
 set(CMAKE_CXX_STANDARD 14)
 
-set_target_properties(bulkmt PROPERTIES
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
+
+include_directories("${PROJECT_SOURCE_DIR}/include/")
+include_directories("${PROJECT_SOURCE_DIR}/extern/spdlog/include/")
+
+add_library(async SHARED ${ASYNC_H} ${ASYNC_SRC} )
+
+set_target_properties(async PROPERTIES
   CXX_STANDARD_REQUIRED ON
   CXX_STANDARD 14
   COMPILE_OPTIONS "-Wpedantic;-Wall;-Wextra"
 )
 
-target_link_libraries(bulkmt
+target_link_libraries(async
   ${CMAKE_THREAD_LIBS_INIT}
   )
 
-install(TARGETS bulkmt RUNTIME DESTINATION bin)
+install(TARGETS async RUNTIME DESTINATION bin)
+
+add_subdirectory(./example)
 
 macro(install)
 endmacro()

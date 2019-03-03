@@ -10,6 +10,7 @@
 #include "threadsafequeue.h"
 #include "bulkconstants.h"
 #include <map>
+#include "lognamesresolver.h"
 
 namespace bulk
 {
@@ -72,7 +73,7 @@ class MultiThreadLogger
 {
 public:
     MultiThreadLogger():
-        m_consoleLog(spdlog::stdout_logger_st(CONSOLE_LOGGER_NAME)),
+        m_consoleLog(spdlog::stdout_logger_st(CONSOLE_LOGGER_NAME+std::to_string(LogNamesResolver::instance().getNextConsoleLogPrefix()))),
         m_freeThreads(0)
     {
         m_consoleLog->set_pattern("bulk: %v");
@@ -204,7 +205,10 @@ private:
                 std::string logName("bulk");
                 const auto nowDuration = std::chrono::system_clock::now().time_since_epoch();
                 const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(nowDuration).count();
-                logName.append(std::to_string(ms) ).append(std::to_string(m_uniqueNamePostfix++) ).append(".log");
+                //logName.append(std::to_string(ms) ).append(std::to_string(m_uniqueNamePostfix++) ).append(".log");
+                logName.append(std::to_string(ms) ).
+                        append(std::to_string(LogNamesResolver::instance().getNextFileLogPrefix() ) ).
+                        append(".log");
 
                 m_fileLoggingTasks.emplace([cmds = *commands, logName]() mutable {
                     auto fileLog = spdlog::basic_logger_mt(logName, logName);
@@ -253,7 +257,7 @@ private:
 
     std::atomic_int m_freeThreads;
 
-    size_t m_uniqueNamePostfix = 0;
+//    size_t m_uniqueNamePostfix = 0;
 };
 
 }
