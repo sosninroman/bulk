@@ -12,7 +12,7 @@ namespace bulk
 
 const std::string OPEN_BLOCK_SYMBOL = std::string("{");
 const std::string CLOSE_BLOCK_SYMBOL = std::string("}");
-const std::string DELIM_SYMBOL = std::string("\n");
+const char DELIM_SYMBOL = '\n';
 
 template<class HandlerType>
 class CommandProcessor
@@ -35,12 +35,10 @@ public:
         m_handler(std::move(handler) ), m_bulkSize(bulkSize)
     {}
 
-    //Sync interface
-    void processCommandsStream(std::istream &stream);
-
-    //Async interface
     void startWork();
+    //throw std::invalid_argument
     void appendCommandsStream(std::istream& stream);
+    //throw std::invalid_argument
     void stopWork();
 
     const HandlerType& handler() const {return m_handler;}
@@ -80,6 +78,8 @@ private:
 
     //throw std::invalid_argument
     void processCommands(const std::queue<std::string> cmds);
+
+    void handleCurrentCommand();
 private:
     HandlerType m_handler;
 
@@ -91,46 +91,10 @@ private:
     size_t m_linesNum = 0;
     size_t m_blocksNum = 0;
     size_t m_commandsNum = 0;
+
+    char m_currentSymbol = DELIM_SYMBOL;
+    std::string m_currentCommand;
 };
-
-template<class HandlerType>
-void CommandProcessor<HandlerType>::processCommandsStream(std::istream &stream)
-{
-    m_handler.startWork();
-
-    for(std::string command; std::getline(stream, command);)
-    {
-        ++m_linesNum;
-        if(command != OPEN_BLOCK_SYMBOL && command != CLOSE_BLOCK_SYMBOL)
-        {
-            ++m_commandsNum;
-        }
-        auto status = pushCmd(command);
-
-        if(status == Status::READY || status == Status::READY_START_BLOCK_BULK)
-        {
-            ++m_blocksNum;
-            processCommands(flush() );
-        }
-    }
-    assert(m_status == Status::LOADING || m_status == Status::BLOCK_LOADING
-           || m_status == Status::EMPTY || m_status == Status::BLOCK_EMPTY);
-
-    switch(m_status)
-    {
-    case Status::LOADING:
-        ++m_blocksNum;
-        processCommands(flush() );
-        break;
-    case Status::BLOCK_LOADING:
-        flush();
-        break;
-    default:
-        break;
-    }
-
-    m_handler.stopWork();
-}
 
 template<class HandlerType>
 void CommandProcessor<HandlerType>::startWork()
@@ -139,32 +103,37 @@ void CommandProcessor<HandlerType>::startWork()
 }
 
 template<class HandlerType>
+void CommandProcessor<HandlerType>::handleCurrentCommand()
+{
+    ++m_linesNum;
+    if(m_currentCommand != OPEN_BLOCK_SYMBOL && m_currentCommand != CLOSE_BLOCK_SYMBOL)
+    {
+        ++m_commandsNum;
+    }
+    auto status = pushCmd(m_currentCommand);
+
+    m_currentCommand.clear();
+
+    if(status == Status::READY || status == Status::READY_START_BLOCK_BULK)
+    {
+        ++m_blocksNum;
+        processCommands(flush() );
+    }
+}
+
+template<class HandlerType>
 void CommandProcessor<HandlerType>::appendCommandsStream(std::istream& stream)
 {
-    auto cmdHandler = [this](const std::string& command){
-        ++m_linesNum;
-        if(command != OPEN_BLOCK_SYMBOL && command != CLOSE_BLOCK_SYMBOL)
-        {
-            ++m_commandsNum;
-        }
-        auto status = pushCmd(command);
-
-        if(status == Status::READY || status == Status::READY_START_BLOCK_BULK)
-        {
-            ++m_blocksNum;
-            processCommands(flush() );
-        }
-    };
-    std::string command;
-    if(std::getline(stream, command) &&
-            command == std::string() &&
-            (m_buffer.empty() || m_buffer.back() == std::string() ) )
+    while(stream.get(m_currentSymbol) )
     {
-        cmdHandler(command);
-    }
-    for(; std::getline(stream, command);)
-    {
-        cmdHandler(command);
+        if(m_currentSymbol != DELIM_SYMBOL)
+        {
+            m_currentCommand += m_currentSymbol;
+        }
+        else
+        {
+            handleCurrentCommand();
+        }
     }
 }
 
@@ -173,6 +142,11 @@ void CommandProcessor<HandlerType>::stopWork()
 {
     assert(m_status == Status::LOADING || m_status == Status::BLOCK_LOADING
            || m_status == Status::EMPTY || m_status == Status::BLOCK_EMPTY);
+
+    if(!m_currentCommand.empty() )
+    {
+        handleCurrentCommand();
+    }
 
     switch(m_status)
     {

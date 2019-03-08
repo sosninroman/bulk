@@ -38,12 +38,10 @@ public:
     {
         std::string dataStr(data, size);
         std::stringstream commandStream(dataStr);
-        //commandStream.read(data, size);
 
         std::lock_guard<std::mutex> guard(m_processorsMutex);
 
         auto handler = m_commandProcessors.at(reinterpret_cast<CommandProcessorType*>(handle) ).get();
-        //handler->processCommandsStream(commandStream);
         handler->appendCommandsStream(commandStream);
     }
 
