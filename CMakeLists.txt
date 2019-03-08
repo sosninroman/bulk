@@ -15,7 +15,9 @@ file(GLOB ASYNC_SRC
 		
 set(CMAKE_CXX_STANDARD 14)
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
+if(WIN32)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
+endif(WIN32)
 
 include_directories("${PROJECT_SOURCE_DIR}/include/")
 include_directories("${PROJECT_SOURCE_DIR}/extern/spdlog/include/")
@@ -32,7 +34,6 @@ target_link_libraries(async
   ${CMAKE_THREAD_LIBS_INIT}
   )
 
-install(TARGETS async RUNTIME DESTINATION bin)
 
 add_subdirectory(./example)
 
