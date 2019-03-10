@@ -34,6 +34,8 @@ target_link_libraries(async
   ${CMAKE_THREAD_LIBS_INIT}
   )
 
+install(TARGETS async DESTINATION lib)
+install(FILES ${PROJECT_SOURCE_DIR}/include/async.h DESTINATION include)
 
 add_subdirectory(./example)
 
